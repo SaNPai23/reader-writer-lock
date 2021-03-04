@@ -1,0 +1,64 @@
+1. The priority inversion problem could cause that a higher-priority process needs to wait for the 
+completion of a lower-priority process.
+i. Priority inheritance is one approach to address this issue. Please give another approach and 
+briefly describe its idea.
+
+Answer:
+Another approach to solve this issue would be to use the "Priority Ceiling protocol".
+In this protocol, we specify a "priority ceiling", which can be assigned to a process which has acquired a lock.
+This ensures that processes that axquire locks get executed with the highest priorities possible in order to solve the issue, as there cannot be a higher priority process waiting on another process that has acquired a lock, as the lock-having process will have the highest possible priority.
+Once the process releases the lock, its priority is restored to its original priority.
+
+ii. Design a test case to show that your approach can address the priority inversion problem. 
+You should compare the results that derived from the original XINU implementation (use semaphore) 
+and that derived from your implementation (use readers/writer locks).
+
+Answer:
+In task1.c, there are 2 readers and 1 writer.
+Reader 1 has priority 30, Writer 1 has priority 10 and writer 2 has priority of 40.
+Reader 1 acquires lock/semaphore 1.
+Next, writer 1 acquires lock/semaphore 2.
+When reader 2 tries to acquire lock/semaphore 2, it is put in queue.
+In the semaphore implementation, there is no priority inheritance, so it allows raeder 1 to finish before scheduling writer 1, which has a higher priority process waiting.
+On the other hand, in the lock implementation, the priority of Writer 1 is boosted and hence is allowed to finish first.
+
+Semaphore output:reader 1 trying to acquire semaphore
+reader 1 acquired semaphore
+reader 2 trying to acquire semaphore
+reader 2 acquired semaphore
+writer 1 trying to acquire semaphore
+writer 1 acquired semaphore
+writer 1 releasing semaphore
+reader 1 releasing semaphore
+reader 2 releasing semaphore
+
+Lock output:reader 1 trying to acquire lock
+reader 1 acquired lock
+reader 2 trying to acquire lock
+reader 2 acquired lock
+writer 1 trying to acquire lock
+reader 1: releasing lock
+reader 2: releasing lock
+writer 1 acquired lock
+writer 1: releasing lock
+
+2. Synchronization is a quite complex issue in operating systems. To show your understanding about 
+process synchronization, you are asked to point out a reader/writer synchronization issue in this 
+pesudo-code: task2_sync_issue.c. Multiple reader threads can execute this code concurrently by 
+calling do_update. All the variables starting with global_ are global variables. 
+You are asked to describe the potential issue caused by the incorrect synchronization and point out 
+at least one possible thread interleaving that would trigger the problem. Put your answer in 
+Lab3Answers.txt mentioned above. 
+
+
+Answer:
+The try_update() function here is the critical section that is being guarded using a reader's lock.
+Since it is not a writer's lock, multiple threads can acquire a lock to access this function.
+This function itself uses a counting semaphore to guard the buffer_add() function. Now, the counting semaphoreis set to 10 initially.
+This indicates that upto 10 threads can simultaneously write to the buffer by calling the buffer_add() function.
+So, in some cases like the one below, it is possible that one thread performs an incorrect write and hence overwrite the data written by another thread (which it should ideally append to the buffer).
+
+Example:
+Thread T1 acquires the reader's lock and starts executing try_update() and (global_now >= newtime) is false and after reducing semaphore count, the thread starts executing buffer_add().
+After T1 executes the memcpy() to copy to buffer, it is preempted and another thread T2 begins, which in turn performs the same steps as T1.
+Now, T1 has not finished executing and hence T2 will overwrite the data written by T1.
